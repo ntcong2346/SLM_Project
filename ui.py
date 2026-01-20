@@ -9,6 +9,7 @@ from langchain_community.embeddings import HuggingFaceEmbeddings
 # --- CẤU HÌNH TRANG CHUYÊN NGHIỆP ---
 st.set_page_config(
     page_title="Bio-SLM AI Assistant",
+    page_icon="🧬",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -27,14 +28,14 @@ st.markdown("""
 # --- TIÊU ĐỀ VÀ GIỚI THIỆU ---
 col1, col2 = st.columns([1, 4])
 with col1:
-    st.markdown("")
+    st.image("https://img.icons8.com/fluency/96/dna-helix.png", width=80)
 with col2:
     st.title("Bio-SLM AI Assistant")
-    st.markdown("*Hệ thống hỗ trợ học tập Sinh học 12 dựa trên mô hình ngôn ngữ nhỏ (SLM) & RAG*")
+    st.markdown("*Hệ thống RAG hỗ trợ học tập Sinh học 12 dựa trên mô hình ngôn ngữ nhỏ (SLM)*")
 
 st.divider()
 
-# --- HÀM KHỞI TẠO RAG (GIỮ NGUYÊN LOGIC NHƯNG THÊM THÔNG BÁO UI) ---
+# --- HÀM KHỞI TẠO RAG ---
 @st.cache_resource
 def init_knowledge_base():
     data_path = "./data"
@@ -50,6 +51,7 @@ def init_knowledge_base():
     
     if not documents: return None
 
+    # Chia nhỏ văn bản thành các đoạn tri thức chuẩn
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=800, chunk_overlap=150)
     chunks = text_splitter.split_documents(documents)
     
@@ -59,8 +61,7 @@ def init_knowledge_base():
 
 # --- SIDEBAR: QUẢN LÝ HỆ THỐNG ---
 with st.sidebar:
-    st.image("https://img.icons8.com/fluency/96/dna-helix.png", width=80)
-    st.header(" Cấu hình hệ thống")
+    st.header("⚙️ Cấu hình SLM")
     
     # Trạng thái RAG
     with st.container():
@@ -73,76 +74,68 @@ with st.sidebar:
         except Exception as e:
             st.error(f"● Lỗi RAG: {e}")
 
-    # Thông số hiệu năng từ Benchmark
+    # Thông số hiệu năng SLM
     st.markdown("---")
-    st.subheader("Hiệu năng thực tế")
-    st.write(f"**Model:** Qwen2-1.5B")
-    st.write(f"**Nén:** 4-bit GGUF (941MB)")
-    st.write(f"**Tốc độ:** 6.18 tokens/s")
+    st.subheader("Thông số SLM")
+    st.write(f"**Model:** Llama-3.1-8B-Instant")
+    st.write(f"**Kiến trúc:** SLM (Small Language Model)")
+    st.write(f"**Optimization:** Groq LPU Inference")
     
-    # Nguồn trích dẫn (Chỉ hiện khi có kết quả tìm kiếm)
+    # Nguồn trích dẫn
     st.markdown("---")
-    st.subheader("Nguồn dữ liệu")
+    st.subheader("Nguồn kiến thức RAG")
     source_container = st.empty()
 
 # --- KHUNG CHAT ---
 if "messages" not in st.session_state:
-    st.session_state.messages = [{"role": "assistant", "content": "Chào bạn! Tôi đã sẵn sàng hỗ trợ bạn ôn tập Sinh học 12. Bạn cần tìm hiểu về chủ đề nào?"}]
+    st.session_state.messages = [{"role": "assistant", "content": "Chào bạn! Tôi là trợ lý SLM đã được nạp kiến thức Sinh học 12. Bạn cần tìm hiểu về chủ đề nào?"}]
 
-# Hiển thị lịch sử chat
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-# Xử lý nhập liệu
 if prompt := st.chat_input("Hỏi tôi về Di truyền, Tiến hóa, Sinh thái..."):
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
 
     with st.chat_message("assistant"):
-        with st.spinner("Đang truy xuất kiến thức..."):
+        with st.spinner("🔄 SLM đang trích xuất tri thức..."):
             context = ""
             sources = []
             
-            # Tìm kiếm RAG
+            # 1. Tìm kiếm RAG từ file tri thức
             if vector_db:
                 docs = vector_db.similarity_search(prompt, k=2)
                 context = "\n\n".join([d.page_content for d in docs])
-                sources = [d.page_content[:150] + "..." for d in docs]
+                sources = [d.page_content[:200] + "..." for d in docs]
 
-            # Hiển thị nguồn bên sidebar để UI chính sạch sẽ
             if sources:
                 with source_container.container():
                     for i, s in enumerate(sources):
-                        st.caption(f"Trích đoạn {i+1}:")
+                        st.caption(f"Đoạn trích {i+1}:")
                         st.info(s)
-            else:
-                source_container.write("Không có tài liệu phù hợp.")
 
-          # --- GỌI MÔ HÌNH QUA API (DÀNH CHO DEPLOY CLOUD) ---
+            # 2. Gọi SLM qua Groq API
             try:
-                # 1. Lấy API Key từ Streamlit Secrets (Cần thiết lập trên Cloud)
-                # Nếu chạy local để test, bạn có thể thay bằng: api_key = "KEY_CỦA_BẠN"
                 api_key = st.secrets["GROQ_API_KEY"] 
-                
                 url = "https://api.groq.com/openai/v1/chat/completions"
                 headers = {
                     "Authorization": f"Bearer {api_key}",
                     "Content-Type": "application/json"
                 }
                 
-                # 2. Cấu hình tham số gọi mẫu (Dùng Qwen2 hoặc tương đương)
+                # Cấu hình tham số chuẩn SLM
                 data = {
-                    "model": "qwen2-72b-4bit", # Groq hỗ trợ các bản nén siêu nhanh
+                    "model": "llama-3.1-8b-instant", 
                     "messages": [
                         {
                             "role": "system", 
-                            "content": f"Bạn là chuyên gia Sinh học 12. Hãy trả lời dựa trên tri thức: {context}"
+                            "content": f"Bạn là chuyên gia Sinh học 12 dạng SLM. Hãy trả lời ngắn gọn dựa trên tri thức: {context}"
                         },
                         {"role": "user", "content": prompt}
                     ],
-                    "temperature": 0.5
+                    "temperature": 0.4
                 }
                 
                 response = requests.post(url, json=data, headers=headers)
@@ -152,7 +145,7 @@ if prompt := st.chat_input("Hỏi tôi về Di truyền, Tiến hóa, Sinh thái
                     st.markdown(res_text)
                     st.session_state.messages.append({"role": "assistant", "content": res_text})
                 else:
-                    st.error(f"Lỗi API: {response.status_code} - {response.text}")
+                    st.error(f"Lỗi API: {response.status_code}")
                     
             except Exception as e:
-                st.error(f"Lỗi kết nối Cloud API: {e}")
+                st.error(f"Lỗi kết nối SLM Cloud: {e}")
