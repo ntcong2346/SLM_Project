@@ -27,8 +27,7 @@ st.markdown("""
 
 # --- TIÊU ĐỀ VÀ GIỚI THIỆU ---
 col1, col2 = st.columns([1, 4])
-with col1:
-    st.image("https://img.icons8.com/fluency/96/dna-helix.png", width=80)
+
 with col2:
     st.title("Bio-SLM AI Assistant")
     st.markdown("*Hệ thống RAG hỗ trợ học tập Sinh học 12 dựa trên mô hình ngôn ngữ nhỏ (SLM)*")
