@@ -99,7 +99,7 @@ if prompt := st.chat_input("Hỏi tôi về Di truyền, Tiến hóa, Sinh thái
         st.markdown(prompt)
 
     with st.chat_message("assistant"):
-        with st.spinner("🔄 SLM đang trích xuất tri thức..."):
+        with st.spinner(" SLM đang trích xuất kiến thức RAG..."):
             context = ""
             sources = []
             
