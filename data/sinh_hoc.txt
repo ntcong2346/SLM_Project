@@ -1,0 +1,68 @@
+--- CHƯƠNG I: CƠ CHẾ DI TRUYỀN VÀ BIẾN DỊ ---
+
+1. Gen và Mã di truyền:
+- Gen là một đoạn của phân tử ADN mang thông tin mã hóa một sản phẩm xác định (chuỗi polipeptit hoặc ARN).
+- Cấu trúc chung của gen cấu trúc gồm 3 vùng: Vùng điều hòa (đầu 3' mạch mã gốc), Vùng mã hóa (ở giữa), Vùng kết thúc (đầu 5' mạch mã gốc).
+- Mã di truyền là mã bộ ba (3 nu đứng liền nhau mã hóa 1 axit amin).
+- Đặc điểm của mã di truyền: Đọc liên tục, tính phổ biến (dùng chung cho mọi loài), tính đặc hiệu (1 bộ ba chỉ mã hóa 1 aa), tính thoái hóa (nhiều bộ ba cùng mã hóa 1 aa).
+
+2. Nhân đôi ADN (Tái bản):
+- Nguyên tắc: Bổ sung (A-T, G-X) và Bán bảo toàn (giữ lại 1 mạch cũ).
+- Diễn ra ở pha S của chu kỳ tế bào.
+- Enzyme chính: ADN polymerase (tổng hợp mạch mới theo chiều 5'->3'), Helicase (tháo xoắn), Ligase (nối đoạn Okazaki).
+
+3. Phiên mã (Tổng hợp ARN):
+- Là quá trình tổng hợp ARN trên khuôn mẫu ADN.
+- Enzyme: ARN polymerase.
+- Nguyên tắc: Bổ sung (A-U, T-A, G-X, X-G).
+- Ở sinh vật nhân sơ: mARN sau phiên mã dùng được ngay.
+- Ở sinh vật nhân thực: Có cắt bỏ Intron, nối Exon để tạo mARN trưởng thành.
+
+4. Dịch mã (Tổng hợp Protein):
+- Là quá trình tổng hợp protein tại Riboxom.
+- Gồm 2 giai đoạn: Hoạt hóa axit amin và Tổng hợp chuỗi polipeptit.
+- Bộ ba mở đầu: AUG (Methionine ở nhân thực, Formyl Methionine ở nhân sơ).
+- Bộ ba kết thúc: UAA, UAG, UGA (không mã hóa axit amin).
+
+5. Đột biến Gen:
+- Là những biến đổi trong cấu trúc của gen liên quan đến 1 hoặc 1 số cặp nu.
+- Các dạng: Mất, Thêm, Thay thế cặp nucleotit.
+- Hậu quả: Đột biến thay thế thường ít gây hại hơn mất hoặc thêm (do mất/thêm gây lệch khung đọc).
+
+--- CHƯƠNG II: TÍNH QUY LUẬT CỦA HIỆN TƯỢNG DI TRUYỀN ---
+
+1. Quy luật Menđen (Phân li và Phân li độc lập):
+- Mỗi tính trạng do một cặp alen quy định, một có nguồn gốc từ bố, một từ mẹ.
+- Các alen phân li đồng đều về các giao tử.
+- Điều kiện nghiệm đúng: Gen nằm trên NST thường, trội lặn hoàn toàn.
+
+2. Liên kết gen và Hoán vị gen:
+- Liên kết gen: Các gen nằm trên cùng 1 NST phân li cùng nhau (hạn chế biến dị tổ hợp).
+- Hoán vị gen: Trao đổi đoạn giữa các cromatit khác nguồn trong cặp tương đồng ở kì đầu giảm phân I (tăng biến dị tổ hợp). Tần số hoán vị gen <= 50%.
+
+--- CHƯƠNG III: TIẾN HÓA ---
+
+1. Học thuyết Đác-uyn:
+- Nguyên nhân tiến hóa: Chọn lọc tự nhiên thông qua các đặc điểm thích nghi.
+- Động lực: Đấu tranh sinh tồn.
+- Kết quả: Hình thành loài mới.
+
+2. Học thuyết tiến hóa tổng hợp hiện đại:
+- Tiến hóa nhỏ: Biến đổi cấu trúc di truyền của quần thể (tần số alen và thành phần kiểu gen).
+- Các nhân tố tiến hóa:
+  + Đột biến: Cung cấp nguyên liệu sơ cấp.
+  + Di - Nhập gen: Làm thay đổi tần số alen nhanh chóng.
+  + Chọn lọc tự nhiên: Nhân tố quy định chiều hướng tiến hóa (giữ lại kiểu gen thích nghi).
+  + Các yếu tố ngẫu nhiên: Làm thay đổi tần số alen đột ngột (đặc biệt ở quần thể nhỏ).
+  + Giao phối không ngẫu nhiên: Làm thay đổi thành phần kiểu gen (tăng đồng hợp, giảm dị hợp) nhưng không đổi tần số alen.
+
+--- CHƯƠNG IV: SINH THÁI HỌC ---
+
+1. Quần thể sinh vật:
+- Là tập hợp cá thể cùng loài, cùng sinh sống trong 1 khoảng không gian, thời gian, có khả năng sinh sản.
+- Các đặc trưng cơ bản: Tỉ lệ giới tính, Nhóm tuổi, Sự phân bố cá thể, Mật độ cá thể (quan trọng nhất), Kích thước quần thể.
+
+2. Quần xã sinh vật:
+- Tập hợp các quần thể khác loài.
+- Đặc trưng: Độ đa dạng (số lượng loài), Loài ưu thế (số lượng đông, vai trò lớn), Loài đặc trưng (chỉ có ở quần xã đó).
+- Mối quan hệ: Cộng sinh (cùng có lợi), Hội sinh (1 lợi 1 không hại), Cạnh tranh, Kí sinh, Sinh vật ăn sinh vật.
