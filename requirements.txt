@@ -6,3 +6,7 @@ chromadb
 sentence-transformers
 pypdf
 requests
+protobuf==3.20.3
+langchain-qdrant
+qdrant-client
+langchain-huggingface

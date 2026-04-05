@@ -1,0 +1,23 @@
+services:
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: qdrant_db
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - ./qdrant_data:/qdrant/storage
+    restart: always
+
+  bio_slm_app:
+    build: .
+    container_name: bio_slm_ui
+    ports:
+      - "8501:8501"
+    volumes:
+      - .:/app # Đồng bộ code để sửa code máy thật, app trong docker cập nhật luôn
+      - ./.streamlit/secrets.toml:/app/.streamlit/secrets.toml # Map file key vào
+    depends_on:
+      - qdrant
+    environment:
+      - PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python

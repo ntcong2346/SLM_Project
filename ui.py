@@ -1,10 +1,7 @@
 import streamlit as st
 import requests
-import os
-from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_community.document_loaders import PyPDFLoader, TextLoader
-from langchain_community.vectorstores import Chroma
-from langchain_community.embeddings import HuggingFaceEmbeddings
+from qdrant_client import models # Cần import models để dùng bộ lọc (Filter) của Qdrant
+from database_manager import init_vector_store, get_all_sources, delete_source_from_db 
 
 # --- CẤU HÌNH TRANG CHUYÊN NGHIỆP ---
 st.set_page_config(
@@ -14,7 +11,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- CSS TÙY CHỈNH ĐỂ LÀM ĐẸP UI ---
+# --- CSS TÙY CHỈNH ---
 st.markdown("""
     <style>
     .main { background-color: #0e1117; }
@@ -25,116 +22,141 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- TIÊU ĐỀ VÀ GIỚI THIỆU ---
-col1, col2 = st.columns([1, 4])
+# --- TỐI ƯU HÓA: CACHE VECTOR DB ---
+@st.cache_resource(show_spinner="Đang kết nối Vector DB...")
+def get_vector_db():
+    return init_vector_store()
 
+# --- TIÊU ĐỀ ---
+col1, col2 = st.columns([1, 4])
 with col2:
     st.title("Bio-SLM AI Assistant")
-    st.markdown("*Hệ thống RAG hỗ trợ học tập Sinh học 12 dựa trên mô hình ngôn ngữ nhỏ (SLM)*")
+    st.markdown("*Hệ thống RAG hỗ trợ học tập Sinh học 12 (NotebookLM Style)*")
 
 st.divider()
 
-# --- HÀM KHỞI TẠO RAG ---
-@st.cache_resource
-def init_knowledge_base():
-    data_path = "./data"
-    if not os.path.exists(data_path) or not os.listdir(data_path):
-        return None
-    
-    documents = []
-    for filename in os.listdir(data_path):
-        file_path = os.path.join(data_path, filename)
-        if filename.endswith(".txt"):
-            loader = TextLoader(file_path, encoding="utf-8")
-            documents.extend(loader.load())
-    
-    if not documents: return None
-
-    # Chia nhỏ văn bản thành các đoạn tri thức chuẩn
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=800, chunk_overlap=150)
-    chunks = text_splitter.split_documents(documents)
-    
-    embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
-    vector_db = Chroma.from_documents(chunks, embeddings)
-    return vector_db
-
-# --- SIDEBAR: QUẢN LÝ HỆ THỐNG ---
+# --- SIDEBAR: QUẢN LÝ ---
 with st.sidebar:
     st.header("⚙️ Cấu hình SLM")
     
-    # Trạng thái RAG
-    with st.container():
-        try:
-            vector_db = init_knowledge_base()
-            if vector_db:
-                st.success("● Kho kiến thức RAG: Sẵn sàng")
-            else:
-                st.warning("● Kho kiến thức RAG: Trống (data/)")
-        except Exception as e:
-            st.error(f"● Lỗi RAG: {e}")
+    try:
+        vector_db = get_vector_db()
+        st.success("🟢 Qdrant DB & Jina Embeddings: Ready")
+    except Exception as e:
+        vector_db = None
+        st.error(f"🔴 Lỗi kết nối Vector DB: {e}")
 
-    # Thông số hiệu năng SLM
+    st.markdown("---")
+    
+    # --- TÍNH NĂNG MỚI: CHỌN NGUỒN TÀI LIỆU ---
+    st.header("📚 Nguồn tài liệu")
+    
+    if st.button("🔄 Làm mới danh sách", use_container_width=True):
+        st.rerun()
+
+    all_docs = get_all_sources() if vector_db else []
+    selected_sources = []
+    if vector_db:
+        try:
+            all_docs = get_all_sources()
+            if all_docs:
+                st.write("Tích chọn tài liệu AI được phép dùng:")
+                for doc in all_docs:
+                    col_check, col_del = st.columns([4, 1])
+                    with col_check:
+                        # Hiển thị checkbox, mặc định là được chọn
+                        if st.checkbox(doc, value=True, key=f"check_{doc}"):
+                            selected_sources.append(doc)
+                    with col_del:
+                        # Nút xóa tài liệu
+                        if st.button("🗑️", key=f"del_{doc}", help="Xóa hoàn toàn khỏi DB"):
+                            if delete_source_from_db(doc):
+                                st.success("Đã xóa!")
+                                st.rerun() # Tải lại trang để cập nhật danh sách
+            else:
+                st.info("Chưa có tài liệu nào. Hãy upload bên tab kia.")
+        except Exception as e:
+            st.error(f"Lỗi tải danh sách: {e}")
+
     st.markdown("---")
     st.subheader("Thông số SLM")
-    st.write(f"**Model:** Llama-3.1-8B-Instant")
-    st.write(f"**Kiến trúc:** SLM (Small Language Model)")
-    st.write(f"**Optimization:** Groq LPU Inference")
+    st.write("**Model:** Llama-3.1-8B-Instant")
+    st.write("**DB:** Qdrant (Vector Engine)")
+    st.write("**Optimization:** Groq LPU")
     
-    # Nguồn trích dẫn
     st.markdown("---")
-    st.subheader("Nguồn kiến thức RAG")
+    st.subheader("Trích dẫn RAG")
     source_container = st.empty()
 
 # --- KHUNG CHAT ---
 if "messages" not in st.session_state:
-    st.session_state.messages = [{"role": "assistant", "content": "Chào bạn! Tôi là trợ lý SLM đã được nạp kiến thức Sinh học 12. Bạn cần tìm hiểu về chủ đề nào?"}]
+    st.session_state.messages = [{"role": "assistant", "content": "Chào bạn! Tôi đã sẵn sàng hỗ trợ bạn ôn tập Sinh học 12. Hãy tích chọn tài liệu ở bên trái và đặt câu hỏi nhé!"}]
 
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-if prompt := st.chat_input("Hỏi tôi về Di truyền, Tiến hóa, Sinh thái..."):
+if prompt := st.chat_input("Hỏi về tài liệu đã chọn..."):
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
 
     with st.chat_message("assistant"):
-        with st.spinner(" SLM đang trích xuất kiến thức RAG..."):
+        with st.spinner("Đang truy vấn kiến thức & phân tích..."):
             context = ""
-            sources = []
             
-            # 1. Tìm kiếm RAG từ file tri thức
+            # --- BƯỚC 1: TRUY VẤN DỮ LIỆU CÓ BỘ LỌC TÙY CHỈNH ---
             if vector_db:
-                docs = vector_db.similarity_search(prompt, k=2)
-                context = "\n\n".join([d.page_content for d in docs])
-                sources = [d.page_content[:200] + "..." for d in docs]
+                if not selected_sources:
+                    with source_container.container():
+                        st.warning("⚠️ Bạn chưa chọn tài liệu nào để tham khảo.")
+                else:
+                    try:
+                        # Tạo bộ lọc: Chỉ tìm trong các "source" nằm trong danh sách selected_sources
+                        search_filter = models.Filter(
+                            must=[
+                                models.FieldCondition(
+                                    key="metadata.source",
+                                    match=models.MatchAny(any=selected_sources),
+                                )
+                            ]
+                        )
+                        
+                        # Thêm filter vào hàm search
+                        docs = vector_db.similarity_search(prompt, k=3, filter=search_filter)
+                        
+                        if docs:
+                            context = "\n\n---\n\n".join([d.page_content for d in docs])
+                            
+                            with source_container.container():
+                                for i, d in enumerate(docs):
+                                    source_name = d.metadata.get('source', 'Unknown')
+                                    st.caption(f"Nguồn {i+1} ({source_name}):")
+                                    st.info(d.page_content[:200] + "...")
+                        else:
+                            with source_container.container():
+                                st.warning("Không tìm thấy dữ liệu liên quan trong các tài liệu đã chọn.")
+                    except Exception as e:
+                        st.error(f"Lỗi truy vấn Qdrant: {e}")
 
-            if sources:
-                with source_container.container():
-                    for i, s in enumerate(sources):
-                        st.caption(f"Đoạn trích {i+1}:")
-                        st.info(s)
-
-            # 2. Gọi SLM qua Groq API
+            # --- BƯỚC 2: GỌI GROQ API ---
             try:
                 api_key = st.secrets["GROQ_API_KEY"] 
                 url = "https://api.groq.com/openai/v1/chat/completions"
-                headers = {
-                    "Authorization": f"Bearer {api_key}",
-                    "Content-Type": "application/json"
-                }
+                headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
                 
-                # Cấu hình tham số chuẩn SLM
+                if context:
+                    system_prompt = f"Bạn là trợ lý học tập Sinh học 12. Dựa CHỈ VÀO các thông tin sau đây để trả lời câu hỏi của học sinh. Nếu thông tin không có trong ngữ cảnh, hãy nói không biết:\n\n{context}"
+                else:
+                    system_prompt = "Bạn là trợ lý học tập. Hãy trả lời bằng kiến thức của bạn do học sinh không cung cấp tài liệu tham khảo."
+
                 data = {
                     "model": "llama-3.1-8b-instant", 
                     "messages": [
-                        {
-                            "role": "system", 
-                            "content": f"Bạn là chuyên gia Sinh học 12 dạng SLM. Hãy trả lời ngắn gọn dựa trên tri thức: {context}"
-                        },
+                        {"role": "system", "content": system_prompt},
                         {"role": "user", "content": prompt}
                     ],
-                    "temperature": 0.4
+                    "temperature": 0.3
                 }
                 
                 response = requests.post(url, json=data, headers=headers)
@@ -144,7 +166,6 @@ if prompt := st.chat_input("Hỏi tôi về Di truyền, Tiến hóa, Sinh thái
                     st.markdown(res_text)
                     st.session_state.messages.append({"role": "assistant", "content": res_text})
                 else:
-                    st.error(f"Lỗi API: {response.status_code}")
-                    
+                    st.error(f"Lỗi API Groq: {response.status_code} - {response.text}")
             except Exception as e:
-                st.error(f"Lỗi kết nối SLM Cloud: {e}")
+                st.error(f"Lỗi gọi API: {e}")

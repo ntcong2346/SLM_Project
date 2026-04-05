@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+env/
+
+# Streamlit
+.streamlit/config.toml
+.streamlit/secrets.toml
+
+# Database & Data (Quan trọng vì thư mục này thường rất nặng)
+qdrant_data/
+*.db
+*.json (Nếu bio_info.json chứa dữ liệu lớn hoặc thông tin cá nhân, bạn nên cân nhắc ignore)
+
+# IDE & OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Docker
+.devcontainer/
+
+# Environments
+.env
+.flaskenv
