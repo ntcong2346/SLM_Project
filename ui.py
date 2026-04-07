@@ -1,171 +1,305 @@
 import streamlit as st
 import requests
-from qdrant_client import models # Cần import models để dùng bộ lọc (Filter) của Qdrant
-from database_manager import init_vector_store, get_all_sources, delete_source_from_db 
+from qdrant_client import models
+from database_manager import init_vector_store, get_all_sources, delete_source_from_db
+import history_db
 
-# --- CẤU HÌNH TRANG CHUYÊN NGHIỆP ---
-st.set_page_config(
-    page_title="Bio-SLM AI Assistant",
-    page_icon="🧬",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
+# --- KHỞI TẠO STATE & DATABASE ---
+history_db.init_db()
 
-# --- CSS TÙY CHỈNH ---
+if "current_chat_id" not in st.session_state:
+    st.session_state.current_chat_id = None
+if "current_node_id" not in st.session_state:
+    st.session_state.current_node_id = None
+# State mới để ẩn/hiện sidebar bên phải
+if "show_history" not in st.session_state:
+    st.session_state.show_history = True
+
+st.set_page_config(page_title="Bio-SLM AI Assistant", layout="wide", initial_sidebar_state="expanded")
+
 st.markdown("""
     <style>
-    .main { background-color: #0e1117; }
-    .stChatMessage { border-radius: 15px; margin-bottom: 10px; border: 1px solid #30363d; }
-    .stSidebar { background-color: #161b22; border-right: 1px solid #30363d; }
-    h1 { color: #58a6ff; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-    .status-box { padding: 10px; border-radius: 10px; border: 1px solid #30363d; background-color: #0d1117; margin-bottom: 10px; }
+    /* Main Background Gradient */
+    .stApp {
+        background: radial-gradient(circle at 50% 50%, #1a1b2e 0%, #0f101a 100%);
+        color: #ffffff;
+    }
+
+    /* Center the chat container */
+    [data-testid="stVerticalBlock"] > div:has(div.stChatMessage) {
+        max-width: 850px;
+        margin: 0 auto;
+    }
+
+    /* Copilot Chat Bubbles */
+    .stChatMessage {
+        background-color: rgba(255, 255, 255, 0.05) !important;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 20px !important;
+        padding: 20px !important;
+        margin-bottom: 20px !important;
+    }
+    
+    /* User message specific style */
+    [data-testid="stChatMessage"]:has(div[data-testid="stChatMessageAvatarUser"]) {
+        background-color: rgba(60, 65, 210, 0.2) !important;
+        border: 1px solid rgba(100, 110, 255, 0.3);
+    }
+
+    /* Floating Input Bar Styling */
+    .stChatInputContainer {
+        padding: 20px !important;
+        background: transparent !important;
+        border: none !important;
+    }
+    
+    .stChatInputContainer > div {
+        background-color: #25273d !important;
+        border: 1px solid #3e416d !important;
+        border-radius: 24px !important;
+        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.8) !important;
+    }
+
+    /* Typography */
+    h1 {
+        font-weight: 700 !important;
+        background: linear-gradient(90deg, #fff, #8a94ff);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        text-align: center;
+        padding: 50px 0 !important;
+    }
+    
+    /* Sidebar styling for 'Library' feel */
+    section[data-testid="stSidebar"] {
+        background-color: #0c0d14 !important;
+        border-right: 1px solid #1f212e !important;
+    }
+
+    /* Làm mờ hoặc ẩn nền của avatar mặc định */
+[data-testid="stChatMessageAvatarUser"], 
+[data-testid="stChatMessageAvatarAssistant"] {
+    background-color: transparent !important;
+    border: none !important;
+}
+
+
+    /* Ẩn nút đóng sidebar mặc định để dùng giao diện tùy chỉnh nếu muốn */
+    [data-testid="stSidebarNav"] {display: none;}
+
+    /* Làm cho sidebar trông giống một bảng điều khiển nổi */
+    section[data-testid="stSidebar"] {
+        background-color: #0b0c12 !important;
+        border-right: 1px solid #1f212e !important;
+        box-shadow: 2px 0 10px rgba(0,0,0,0.5);
+    }
+
+    /* Style lại các nút trong lịch sử cho giống Copilot Library */
+    .stButton button {
+        border: none !important;
+        background-color: transparent !important;
+        text-align: left !important;
+        padding: 5px 10px !important;
+        transition: 0.3s;
+    }
+
+    
+    .stButton button:hover {
+        background-color: rgba(255, 255, 255, 0.05) !important;
+        border-radius: 8px !important;
+    }
+            
+/* Tùy chỉnh kích thước icon cho cân đối */
+.stChatMessage img {
+    border-radius: 50%; /* Làm icon hình tròn cho giống Copilot */
+    width: 35px;
+    height: 35px;
+}
+            
+    .stButton button {
+        border-radius: 12px !important;
+        background-color: #1f212e !important;
+        border: 1px solid #3e416d !important;
+        color: white !important;
+    }
     </style>
     """, unsafe_allow_html=True)
 
-# --- TỐI ƯU HÓA: CACHE VECTOR DB ---
 @st.cache_resource(show_spinner="Đang kết nối Vector DB...")
 def get_vector_db():
     return init_vector_store()
 
-# --- TIÊU ĐỀ ---
-col1, col2 = st.columns([1, 4])
-with col2:
-    st.title("Bio-SLM AI Assistant")
-    st.markdown("*Hệ thống RAG hỗ trợ học tập Sinh học 12 (NotebookLM Style)*")
+vector_db = get_vector_db()
 
-st.divider()
-
-# --- SIDEBAR: QUẢN LÝ ---
+# ==========================================
+# 1. LEFT SIDEBAR: CẤU HÌNH RAG
+# ==========================================
 with st.sidebar:
-    st.header("⚙️ Cấu hình SLM")
-    
-    try:
-        vector_db = get_vector_db()
-        st.success("🟢 Qdrant DB & Jina Embeddings: Ready")
-    except Exception as e:
-        vector_db = None
-        st.error(f"🔴 Lỗi kết nối Vector DB: {e}")
+    st.header("Cấu hình SLM")
+    if vector_db:
+        st.success(" Vector DB: Ready")
+    else:
+        st.error(" Lỗi kết nối Vector DB")
 
     st.markdown("---")
-    
-    # --- TÍNH NĂNG MỚI: CHỌN NGUỒN TÀI LIỆU ---
-    st.header("📚 Nguồn tài liệu")
-    
-    if st.button("🔄 Làm mới danh sách", use_container_width=True):
+    st.header(" Nguồn tài liệu")
+    if st.button(" Làm mới danh sách", use_container_width=True):
         st.rerun()
 
-    all_docs = get_all_sources() if vector_db else []
     selected_sources = []
     if vector_db:
-        try:
-            all_docs = get_all_sources()
-            if all_docs:
-                st.write("Tích chọn tài liệu AI được phép dùng:")
-                for doc in all_docs:
-                    col_check, col_del = st.columns([4, 1])
-                    with col_check:
-                        # Hiển thị checkbox, mặc định là được chọn
-                        if st.checkbox(doc, value=True, key=f"check_{doc}"):
-                            selected_sources.append(doc)
-                    with col_del:
-                        # Nút xóa tài liệu
-                        if st.button("🗑️", key=f"del_{doc}", help="Xóa hoàn toàn khỏi DB"):
-                            if delete_source_from_db(doc):
-                                st.success("Đã xóa!")
-                                st.rerun() # Tải lại trang để cập nhật danh sách
-            else:
-                st.info("Chưa có tài liệu nào. Hãy upload bên tab kia.")
-        except Exception as e:
-            st.error(f"Lỗi tải danh sách: {e}")
+        all_docs = get_all_sources()
+        if all_docs:
+            for doc in all_docs:
+                col_check, col_del = st.columns([4, 1])
+                with col_check:
+                    if st.checkbox(doc, value=True, key=f"check_{doc}"):
+                        selected_sources.append(doc)
+                with col_del:
+                    if st.button("✖", key=f"del_{doc}"):
+                        delete_source_from_db(doc)
+                        st.rerun()
 
-    st.markdown("---")
-    st.subheader("Thông số SLM")
-    st.write("**Model:** Llama-3.1-8B-Instant")
-    st.write("**DB:** Qdrant (Vector Engine)")
-    st.write("**Optimization:** Groq LPU")
-    
-    st.markdown("---")
-    st.subheader("Trích dẫn RAG")
-    source_container = st.empty()
+# ==========================================
+# MAIN LAYOUT: CHAT (Trái) & HISTORY (Phải)
+# ==========================================
+# Nút Toggle History ở góc trên bên phải
+col_title, col_toggle = st.columns([8, 1])
+with col_title:
+    st.title("Bio-SLM Assistant")
+with col_toggle:
+    toggle_text = "Ẩn Lịch sử" if st.session_state.show_history else " Hiện Lịch sử"
+    if st.button(toggle_text, use_container_width=True):
+        st.session_state.show_history = not st.session_state.show_history
+        st.rerun()
 
-# --- KHUNG CHAT ---
-if "messages" not in st.session_state:
-    st.session_state.messages = [{"role": "assistant", "content": "Chào bạn! Tôi đã sẵn sàng hỗ trợ bạn ôn tập Sinh học 12. Hãy tích chọn tài liệu ở bên trái và đặt câu hỏi nhé!"}]
+# Thay đổi tỷ lệ cột dựa trên trạng thái toggle
+if st.session_state.show_history:
+    chat_col, history_col = st.columns([3, 1], gap="large")
+else:
+    chat_col = st.container() # Chat chiếm toàn màn hình nếu ẩn lịch sử
 
-for message in st.session_state.messages:
-    with st.chat_message(message["role"]):
-        st.markdown(message["content"])
-
-if prompt := st.chat_input("Hỏi về tài liệu đã chọn..."):
-    st.session_state.messages.append({"role": "user", "content": prompt})
-    with st.chat_message("user"):
-        st.markdown(prompt)
-
-    with st.chat_message("assistant"):
-        with st.spinner("Đang truy vấn kiến thức & phân tích..."):
-            context = ""
+# ------------------------------------------
+# 2. LỊCH SỬ CHAT (Chỉ render nếu show_history là True)
+# ------------------------------------------
+if st.session_state.show_history:
+    with history_col:
+        st.header(" Lịch sử Chat")
+        if st.button("New Chat", use_container_width=True, type="primary"):
+            st.session_state.current_chat_id = None
+            st.session_state.current_node_id = None
+            st.rerun()
             
-            # --- BƯỚC 1: TRUY VẤN DỮ LIỆU CÓ BỘ LỌC TÙY CHỈNH ---
-            if vector_db:
-                if not selected_sources:
-                    with source_container.container():
-                        st.warning("⚠️ Bạn chưa chọn tài liệu nào để tham khảo.")
-                else:
-                    try:
-                        # Tạo bộ lọc: Chỉ tìm trong các "source" nằm trong danh sách selected_sources
-                        search_filter = models.Filter(
-                            must=[
-                                models.FieldCondition(
-                                    key="metadata.source",
-                                    match=models.MatchAny(any=selected_sources),
-                                )
-                            ]
+        st.divider()
+        chats = history_db.get_all_chats()
+        
+        for chat in chats:
+            title = chat['title'] if len(chat['title']) < 30 else chat['title'][:27] + "..."
+            st.markdown('<div class="history-btn">', unsafe_allow_html=True)
+            col_t, col_d = st.columns([4, 1])
+            
+            with col_t:
+                if st.button(f" {title}", key=f"chat_{chat['chat_id']}", use_container_width=True):
+                    # FIX LỖI LOAD CHAT CŨ: Cập nhật CẢ Chat ID và Node ID
+                    st.session_state.current_chat_id = chat['chat_id']
+                    st.session_state.current_node_id = history_db.get_latest_node_for_chat(chat['chat_id'])
+                    st.rerun()
+            
+            with col_d:
+                if st.button("✖", key=f"del_chat_{chat['chat_id']}"):
+                    history_db.delete_chat(chat['chat_id'])
+                    if st.session_state.current_chat_id == chat['chat_id']:
+                        st.session_state.current_chat_id = None
+                        st.session_state.current_node_id = None
+                    st.rerun()
+            st.markdown('</div>', unsafe_allow_html=True)
+
+# ------------------------------------------
+# 3. CHAT INTERFACE
+# ------------------------------------------
+with chat_col:
+    branch = []
+    message_container = st.container()
+    if st.session_state.current_node_id:
+        branch = history_db.get_message_branch(st.session_state.current_node_id)
+    
+    if not branch:
+        st.info("Hãy đặt câu hỏi để bắt đầu cuộc trò chuyện mới!")
+    else:
+        for msg in branch:
+            with st.chat_message(msg["role"]):
+                st.markdown(msg["content"])
+                
+                if msg["role"] == "assistant":
+                    if st.button("Trích xuất nhánh (Fork)", key=f"fork_{msg['message_id']}"):
+                        # Lấy tên chat cũ và tạo tên fork mới
+                        old_chat = history_db.get_chat(st.session_state.current_chat_id)
+                        old_title = old_chat['title'] if old_chat else "Unknown"
+                        fork_title = f"Fork từ: {old_title}"
+                        
+                        new_chat, new_node = history_db.fork_chat(
+                            st.session_state.current_chat_id, 
+                            msg['message_id'],
+                            new_title=fork_title
                         )
-                        
-                        # Thêm filter vào hàm search
-                        docs = vector_db.similarity_search(prompt, k=3, filter=search_filter)
-                        
-                        if docs:
-                            context = "\n\n---\n\n".join([d.page_content for d in docs])
-                            
-                            with source_container.container():
-                                for i, d in enumerate(docs):
-                                    source_name = d.metadata.get('source', 'Unknown')
-                                    st.caption(f"Nguồn {i+1} ({source_name}):")
-                                    st.info(d.page_content[:200] + "...")
-                        else:
-                            with source_container.container():
-                                st.warning("Không tìm thấy dữ liệu liên quan trong các tài liệu đã chọn.")
-                    except Exception as e:
-                        st.error(f"Lỗi truy vấn Qdrant: {e}")
+                        st.session_state.current_chat_id = new_chat
+                        st.session_state.current_node_id = new_node
+                        st.rerun()
 
-            # --- BƯỚC 2: GỌI GROQ API ---
-            try:
-                api_key = st.secrets["GROQ_API_KEY"] 
-                url = "https://api.groq.com/openai/v1/chat/completions"
-                headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
-                
-                if context:
-                    system_prompt = f"Bạn là trợ lý học tập Sinh học 12. Dựa CHỈ VÀO các thông tin sau đây để trả lời câu hỏi của học sinh. Nếu thông tin không có trong ngữ cảnh, hãy nói không biết:\n\n{context}"
-                else:
-                    system_prompt = "Bạn là trợ lý học tập. Hãy trả lời bằng kiến thức của bạn do học sinh không cung cấp tài liệu tham khảo."
+    # Nhập tin nhắn mới
+    if prompt := st.chat_input("Hỏi về tài liệu Sinh học đã chọn..."):
+        if not st.session_state.current_chat_id:
+            new_title = prompt[:30] + "..." if len(prompt) > 30 else prompt
+            st.session_state.current_chat_id = history_db.create_chat(title=new_title)
+    
+            
+        user_node_id = history_db.add_message(
+            chat_id=st.session_state.current_chat_id,
+            parent_id=st.session_state.current_node_id,
+            role="user",
+            content=prompt
+        )
+        st.session_state.current_node_id = user_node_id
+        
+        with st.chat_message("user"):
+            st.markdown(prompt)
 
-                data = {
-                    "model": "llama-3.1-8b-instant", 
-                    "messages": [
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": prompt}
-                    ],
-                    "temperature": 0.3
-                }
+        with st.chat_message("assistant"):
+            with st.spinner("Đang tìm kiếm & suy luận..."):
+                context = ""
+                if vector_db and selected_sources:
+                    search_filter = models.Filter(must=[models.FieldCondition(key="metadata.source", match=models.MatchAny(any=selected_sources))])
+                    docs = vector_db.similarity_search(prompt, k=3, filter=search_filter)
+                    if docs:
+                        context = "\n\n---\n\n".join([d.page_content for d in docs])
+                        with st.expander(" Xem nguồn trích dẫn"):
+                            for i, d in enumerate(docs):
+                                st.caption(f"Nguồn: {d.metadata.get('source', 'Unknown')}")
+                                st.write(d.page_content[:200] + "...")
+
+                groq_messages = [{"role": "system", "content": f"Bạn là trợ lý Sinh học 12. Ngữ cảnh:\n{context}"}]
+                for m in branch:
+                    groq_messages.append({"role": m["role"], "content": m["content"]})
+                groq_messages.append({"role": "user", "content": prompt})
                 
-                response = requests.post(url, json=data, headers=headers)
-                
-                if response.status_code == 200:
-                    res_text = response.json()['choices'][0]['message']['content']
-                    st.markdown(res_text)
-                    st.session_state.messages.append({"role": "assistant", "content": res_text})
-                else:
-                    st.error(f"Lỗi API Groq: {response.status_code} - {response.text}")
-            except Exception as e:
-                st.error(f"Lỗi gọi API: {e}")
+                try:
+                    url = "https://api.groq.com/openai/v1/chat/completions"
+                    headers = {"Authorization": f"Bearer {st.secrets['GROQ_API_KEY']}", "Content-Type": "application/json"}
+                    data = {"model": "llama-3.1-8b-instant", "messages": groq_messages, "temperature": 0.3}
+                    
+                    response = requests.post(url, json=data, headers=headers)
+                    if response.status_code == 200:
+                        res_text = response.json()['choices'][0]['message']['content']
+                        st.markdown(res_text)
+                        
+                        ast_node_id = history_db.add_message(
+                            chat_id=st.session_state.current_chat_id,
+                            parent_id=st.session_state.current_node_id,
+                            role="assistant",
+                            content=res_text
+                        )
+                        st.session_state.current_node_id = ast_node_id
+                    else:
+                        st.error(f"Lỗi API: {response.text}")
+                except Exception as e:
+                    st.error(f"Lỗi: {e}")
